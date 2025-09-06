@@ -1,0 +1,59 @@
+syntax = "proto3";
+package go;
+
+message JoinRequest {
+  string player_name = 1;
+  int32 size = 2;
+}
+
+message PlayerInfo {
+  string player_id = 1;
+  string color = 2;
+}
+
+message JoinReply {
+  string game_id = 1;
+  PlayerInfo me = 2;
+}
+
+message Move {
+  int32 x = 1;
+  int32 y = 2;
+  string color = 3;
+}
+
+message MoveRequest {
+  string game_id = 1;
+  Move move = 2;
+}
+
+message Cell {
+  int32 x = 1;
+  int32 y = 2;
+  string color = 3;
+}
+
+message BoardState {
+  int32 size = 1;
+  repeated Cell cells = 2;
+}
+
+message GameEvent {
+  string type = 1;
+  BoardState board = 2;
+  string turn = 3;
+  string msg = 4;
+}
+
+message SubscribeRequest {
+  string game_id = 1;
+  string player_id = 2;
+}
+
+message Empty {}
+
+service GoGame {
+  rpc JoinGame(JoinRequest) returns (JoinReply);
+  rpc PlayMove(MoveRequest) returns (Empty);
+  rpc Subscribe(SubscribeRequest) returns (stream GameEvent);
+}
