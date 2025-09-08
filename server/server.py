@@ -19,7 +19,8 @@ class Game:
         self.turn = "B"  # Preto começa
         self.lock = threading.Lock()
         self.subscribers = []
-        self.players = {}  # guarda {player_name: color}
+        self.players = {}
+        self.captured = {"B": 0, "W": 0}  # peças capturadas
 
     def join(self, player_name):
         with self.lock:
@@ -37,15 +38,77 @@ class Game:
 
             self.players[player_name] = color
             return color
+        
+    # -------- Funções auxiliares de grupos --------
+    def get_group(self, x, y):
+        """Retorna todas as pedras conectadas ao ponto (x,y) da mesma cor"""
+        color = self.board[y][x]
+        if color == "":
+            return set()
+        
+        visited = set()
+        stack = [(x, y)]
+        while stack:
+            cx, cy = stack.pop()
+            if (cx, cy) in visited:
+                continue
+            visited.add((cx, cy))
+            # vizinhos ortogonais
+            for nx, ny in [(cx-1, cy), (cx+1, cy), (cx, cy-1), (cx, cy+1)]:
+                if 0 <= nx < self.size and 0 <= ny < self.size:
+                    if self.board[ny][nx] == color and (nx, ny) not in visited:
+                        stack.append((nx, ny))
+        return visited
 
+    def get_liberties(self, group):
+        """Retorna o conjunto de casas vazias adjacentes a um grupo"""
+        liberties = set()
+        for (x, y) in group:
+            for nx, ny in [(x-1, y), (x+1, y), (x, y-1), (x, y+1)]:
+                if 0 <= nx < self.size and 0 <= ny < self.size:
+                    if self.board[ny][nx] == "":
+                        liberties.add((nx, ny))
+        return liberties
 
+    def remove_group(self, group, captor_color):
+        """Remove um grupo capturado e soma no score do captor"""
+        for (x, y) in group:
+            self.board[y][x] = ""
+        self.captured[captor_color] += len(group)
+
+    # -------- Jogada --------
     def play_move(self, x, y, color):
         with self.lock:
+            # posição ocupada ou jogada fora de turno
             if self.board[y][x] != "" or color != self.turn:
                 return False
 
+            # coloca pedra
             self.board[y][x] = color
-            self.turn = "W" if self.turn == "B" else "B"
+
+            # checa vizinhos adversários
+            opponent = "W" if color == "B" else "B"
+            to_capture = []
+            for nx, ny in [(x-1, y), (x+1, y), (x, y-1), (x, y+1)]:
+                if 0 <= nx < self.size and 0 <= ny < self.size:
+                    if self.board[ny][nx] == opponent:
+                        group = self.get_group(nx, ny)
+                        if len(self.get_liberties(group)) == 0:
+                            to_capture.append(group)
+
+            # captura grupos adversários
+            for group in to_capture:
+                self.remove_group(group, color)
+
+            # checa suicídio (se a própria pedra ficou sem liberdades e não capturou ninguém)
+            my_group = self.get_group(x, y)
+            if len(self.get_liberties(my_group)) == 0 and not to_capture:
+                # inválido -> desfaz jogada
+                self.board[y][x] = ""
+                return False
+
+            # troca turno
+            self.turn = opponent
             self.notify_all(color, x, y)
             return True
 
@@ -58,7 +121,6 @@ class Game:
         )
         for q in self.subscribers:
             q.put(event)
-
 
     def get_board_state(self):
         cells = []
