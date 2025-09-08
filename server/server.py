@@ -49,15 +49,16 @@ class Game:
             self.notify_all(color, x, y)
             return True
 
-    def notify_all(self, color, x, y):
+    def notify_all(self, color, x, y, passed=False):
         event = go_pb2.GameEvent(
-            type="MOVE",
+            type="PASS" if passed else "MOVE",
             board=self.get_board_state(),
-            turn=self.turn,
-            msg=f"{color} jogou em ({x},{y})"
+            turn=self.turn,  # <<< aqui
+            msg=f"{color} passou a vez" if passed else f"{color} jogou em ({x},{y})"
         )
         for q in self.subscribers:
             q.put(event)
+
 
     def get_board_state(self):
         cells = []
@@ -66,6 +67,14 @@ class Game:
                 if self.board[y][x] != "":
                     cells.append(go_pb2.Cell(x=x, y=y, color=self.board[y][x]))
         return go_pb2.BoardState(size=SIZE, cells=cells)
+    
+    def pass_turn(self, player_color):
+        with self.lock:
+            if player_color == self.turn:
+                self.turn = "W" if self.turn == "B" else "B"
+                self.notify_all(player_color, -1, -1, passed=True)
+                return True
+            return False
 
 # ---------- Serviço gRPC ----------
 class GoGameServicer(go_pb2_grpc.GoGameServicer):
@@ -80,8 +89,12 @@ class GoGameServicer(go_pb2_grpc.GoGameServicer):
         )
 
     def PlayMove(self, request, context):
-        self.game.play_move(request.move.x, request.move.y, request.move.color)
-        return go_pb2.Empty()
+        ok = self.game.play_move(request.move.x, request.move.y, request.move.color)
+        if ok:
+            return go_pb2.MoveReply(success=True, msg="Jogada realizada")
+        else:
+            return go_pb2.MoveReply(success=False, msg="Jogada inválida")
+    
 
     def Subscribe(self, request, context):
         q = queue.Queue()
@@ -92,6 +105,23 @@ class GoGameServicer(go_pb2_grpc.GoGameServicer):
                 yield event
         except grpc.RpcError:
             self.game.subscribers.remove(q)
+
+    def PassTurn(self, request, context):
+        with self.game.lock:
+            if request.color == self.game.turn:
+                self.game.turn = "W" if self.game.turn == "B" else "B"
+                event = go_pb2.GameEvent(
+                    type="PASS",
+                    board=self.game.get_board_state(),
+                    turn=self.game.turn,
+                    msg=f"{request.color} passou a vez"
+                )
+                for q in self.game.subscribers:
+                    q.put(event)
+                return go_pb2.Empty()
+            else:
+                # se não for a vez dele, não faz nada
+                return go_pb2.Empty()
 
 # ---------- Inicialização do servidor ----------
 def serve():

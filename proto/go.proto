@@ -52,8 +52,14 @@ message SubscribeRequest {
 
 message Empty {}
 
+message MoveReply {
+  bool success = 1;
+  string msg = 2;
+}
+
 service GoGame {
   rpc JoinGame(JoinRequest) returns (JoinReply);
-  rpc PlayMove(MoveRequest) returns (Empty);
+  rpc PlayMove(MoveRequest) returns (MoveReply);
   rpc Subscribe(SubscribeRequest) returns (stream GameEvent);
+  rpc PassTurn(PlayerInfo) returns (Empty);
 }

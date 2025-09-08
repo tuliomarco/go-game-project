@@ -42,12 +42,17 @@ class GoGameStub(object):
         self.PlayMove = channel.unary_unary(
                 '/go.GoGame/PlayMove',
                 request_serializer=go__pb2.MoveRequest.SerializeToString,
-                response_deserializer=go__pb2.Empty.FromString,
+                response_deserializer=go__pb2.MoveReply.FromString,
                 _registered_method=True)
         self.Subscribe = channel.unary_stream(
                 '/go.GoGame/Subscribe',
                 request_serializer=go__pb2.SubscribeRequest.SerializeToString,
                 response_deserializer=go__pb2.GameEvent.FromString,
+                _registered_method=True)
+        self.PassTurn = channel.unary_unary(
+                '/go.GoGame/PassTurn',
+                request_serializer=go__pb2.PlayerInfo.SerializeToString,
+                response_deserializer=go__pb2.Empty.FromString,
                 _registered_method=True)
 
 
@@ -72,6 +77,12 @@ class GoGameServicer(object):
         context.set_details('Method not implemented!')
         raise NotImplementedError('Method not implemented!')
 
+    def PassTurn(self, request, context):
+        """Missing associated documentation comment in .proto file."""
+        context.set_code(grpc.StatusCode.UNIMPLEMENTED)
+        context.set_details('Method not implemented!')
+        raise NotImplementedError('Method not implemented!')
+
 
 def add_GoGameServicer_to_server(servicer, server):
     rpc_method_handlers = {
@@ -83,12 +94,17 @@ def add_GoGameServicer_to_server(servicer, server):
             'PlayMove': grpc.unary_unary_rpc_method_handler(
                     servicer.PlayMove,
                     request_deserializer=go__pb2.MoveRequest.FromString,
-                    response_serializer=go__pb2.Empty.SerializeToString,
+                    response_serializer=go__pb2.MoveReply.SerializeToString,
             ),
             'Subscribe': grpc.unary_stream_rpc_method_handler(
                     servicer.Subscribe,
                     request_deserializer=go__pb2.SubscribeRequest.FromString,
                     response_serializer=go__pb2.GameEvent.SerializeToString,
+            ),
+            'PassTurn': grpc.unary_unary_rpc_method_handler(
+                    servicer.PassTurn,
+                    request_deserializer=go__pb2.PlayerInfo.FromString,
+                    response_serializer=go__pb2.Empty.SerializeToString,
             ),
     }
     generic_handler = grpc.method_handlers_generic_handler(
@@ -144,7 +160,7 @@ class GoGame(object):
             target,
             '/go.GoGame/PlayMove',
             go__pb2.MoveRequest.SerializeToString,
-            go__pb2.Empty.FromString,
+            go__pb2.MoveReply.FromString,
             options,
             channel_credentials,
             insecure,
@@ -172,6 +188,33 @@ class GoGame(object):
             '/go.GoGame/Subscribe',
             go__pb2.SubscribeRequest.SerializeToString,
             go__pb2.GameEvent.FromString,
+            options,
+            channel_credentials,
+            insecure,
+            call_credentials,
+            compression,
+            wait_for_ready,
+            timeout,
+            metadata,
+            _registered_method=True)
+
+    @staticmethod
+    def PassTurn(request,
+            target,
+            options=(),
+            channel_credentials=None,
+            call_credentials=None,
+            insecure=False,
+            compression=None,
+            wait_for_ready=None,
+            timeout=None,
+            metadata=None):
+        return grpc.experimental.unary_unary(
+            request,
+            target,
+            '/go.GoGame/PassTurn',
+            go__pb2.PlayerInfo.SerializeToString,
+            go__pb2.Empty.FromString,
             options,
             channel_credentials,
             insecure,
